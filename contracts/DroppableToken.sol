@@ -9,4 +9,5 @@ contract DroppableToken is ERC20 {
 
     function setLockDropContract(address _lockDropContract) external;
     function dropTokens(address to, uint256 amount) external;
+    function dropCap() external view returns (uint256);
 }
