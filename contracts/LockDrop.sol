@@ -4,6 +4,7 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 import "./COLToken.sol";
 
+// TODO consider call(), not transfer, due to gas changes
 contract LockDrop {
     using SafeMath for uint256;
 
@@ -14,48 +15,74 @@ contract LockDrop {
 
     COLToken lockingToken;
 
-    mapping (address => uint256) public lockedAmounts;
+    struct LockerInfo {
+        uint256 lockedAmount;
+        uint256 lockTimestamp;
+    }
+    mapping (address => LockerInfo) public locks;
 
     constructor(COLToken token) public {
         require(address(token) != address(0), "Wrong token address value");
         lockingToken = token;
         totalAmountOfTokenDrop = lockingToken.lockDropSupplyCap();
 
-        lockDeadline = now + 24 hours;
+        lockDeadline = now + 7 days;
         dropStartTimeStamp = lockDeadline + 7 days;
     }
 
-    // TODO decide about min Lock amount or totalAmountOfTokenDrop stability
     function lock() external payable {
-        require(lockDeadline > now, "Locking lasts 24 hours from contract creation");
+        require(now < lockDeadline, "Locking lasts 24 hours from contract creation");
         require(msg.value > 0, "You should stake gt 0 amount of ETH");
 
-        lockedAmounts[msg.sender] = lockedAmounts[msg.sender].add(msg.value);
+        LockerInfo storage lI = locks[msg.sender];
+        if (lI.lockTimestamp == 0) {
+            lI.lockTimestamp = now;
+        }
+        lI.lockedAmount = lI.lockedAmount.add(msg.value);
         totalLockedWei = totalLockedWei.add(msg.value);
     }
 
-    function claim() external {
-        require(dropStartTimeStamp <= now, "Drop hasn't been started yet");
+    function claim(uint256 amount) external {
         require(hasAmountToClaim(msg.sender), "You don't have tokens to claim");
 
-        (uint256 tokensForClaimer, uint256 ETHForClaimer) = getClaimersAssetValues(msg.sender);
-        lockedAmounts[msg.sender] = 0;
-
-        lockingToken.dropTokens(msg.sender, tokensForClaimer);
-        require(msg.sender.send(ETHForClaimer), "Eth transfer failed");
+        if (now < dropStartTimeStamp) {
+            claimETH(msg.sender, amount);
+        } else {
+            claimTokensAndETH(msg.sender);
+        }
     }
 
     function hasAmountToClaim(address claimer) internal view returns (bool) {
-        if (lockedAmounts[claimer] == 0) {
+        LockerInfo storage lI = locks[msg.sender];
+        if (lI.lockedAmount == 0) {
             return false;
         }
         return true;
     }
 
-    function getClaimersAssetValues(address claimer) internal view returns (uint256, uint256) {
+    function claimETH(address payable claimer, uint256 amount) internal {
+        require(amount > 0, "Claiming amount should be gt 0");
+
+        LockerInfo storage lI = locks[msg.sender];
+        if (now >= lI.lockTimestamp + 7 days) {
+            lI.lockedAmount = lI.lockedAmount.sub(amount, "Locked less then wanted to be claimed");
+            totalLockedWei = totalLockedWei.sub(amount);
+            claimer.transfer(amount);
+        } else {
+            revert("Lock period hasn't expired yet");
+        }
+    }
+
+    ///@notice totalAmountOfTokenDrop should be freezed as it is in COLToken
+    function claimTokensAndETH(address payable claimer) internal {
+        LockerInfo storage lI = locks[claimer];
         uint256 tokensForClaimer = (totalAmountOfTokenDrop.mul(10**36)).div(
-            totalLockedWei.mul(lockedAmounts[claimer])
+            totalLockedWei.mul(lI.lockedAmount)
         );
-        return (tokensForClaimer, lockedAmounts[claimer]);
+        uint256 ETHForClaimer = lI.lockedAmount;
+        lI.lockedAmount = 0;
+
+        lockingToken.dropTokens(claimer, tokensForClaimer);
+        claimer.transfer(ETHForClaimer);
     }
 }

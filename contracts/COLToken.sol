@@ -7,7 +7,7 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 contract COLToken is Ownable, ERC20 {
     using SafeMath for uint256;
 
-    enum MintReason{TEAM, LOCKDROP, STAKING}
+    enum MintReason {TEAM, LOCKDROP, STAKING}
 
     string public constant name    = "COL";
     string public constant symbol  = "COL";
