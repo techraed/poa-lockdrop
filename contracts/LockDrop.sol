@@ -1,49 +1,60 @@
 pragma solidity 0.5.7;
 
-import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-import "./DroppableToken.sol";
+import "./COLToken.sol";
 
 contract LockDrop {
     using SafeMath for uint256;
 
-    uint256 totalAmountOfDrop;
-    uint256 lockEndTimestamp;
+    uint256 lockDeadline;
     uint256 dropStartTimeStamp;
+    uint256 totalAmountOfTokenDrop;
+    uint256 totalLockedWei;
 
-    DroppableToken lockingToken;
+    COLToken lockingToken;
 
-    mapping (address => uint256) public lockedAmount;
+    mapping (address => uint256) public lockedAmounts;
 
-    constructor(DroppableToken token) public {
+    constructor(COLToken token) public {
         require(address(token) != address(0), "Wrong token address value");
         lockingToken = token;
-        totalAmountOfDrop = lockingToken.dropCap();
+        totalAmountOfTokenDrop = lockingToken.lockDropSupplyCap();
 
-        lockEndTimestamp = now + 24 hours;
-        dropStartTimeStamp = lockEndTimestamp + 7 days;
+        lockDeadline = now + 24 hours;
+        dropStartTimeStamp = lockDeadline + 7 days;
     }
 
     function lock() external payable {
-        require(lockEndTimestamp > now, "Locking lasts 24 hours from contract creation");
+        require(lockDeadline > now, "Locking lasts 24 hours from contract creation");
         require(msg.value > 0, "You should stake gt 0 amount of ETH");
-        lockedAmount[msg.sender] = msg.value;
+
+        lockedAmounts[msg.sender] = lockedAmounts[msg.sender].add(msg.value);
+        totalLockedWei = totalLockedWei.add(msg.value);
     }
 
     function claim() external {
+        require(dropStartTimeStamp <= now, "Drop hasn't been started yet");
         require(hasAmountToClaim(msg.sender), "You don't have tokens to claim");
-        uint256 COLForClaimer = totalAmountOfDrop.div(
-            address(this).balance.mul(lockedAmount[msg.sender])
-        );
-        lockedAmount[msg.sender] = 0;
-        lockingToken.dropTokens(msg.sender, COLForClaimer);
+
+        (uint256 tokensForClaimer, uint256 ETHForClaimer) = getClaimersAssetValues(msg.sender);
+        lockedAmounts[msg.sender] = 0;
+
+        lockingToken.dropTokens(msg.sender, tokensForClaimer);
+        require(msg.sender.send(ETHForClaimer), "Eth transfer failed");
     }
 
     function hasAmountToClaim(address claimer) internal view returns (bool) {
-        if (lockedAmount[claimer] == 0) {
+        if (lockedAmounts[claimer] == 0) {
             return false;
         }
         return true;
+    }
+
+    function getClaimersAssetValues(address claimer) internal view returns (uint256, uint256) {
+        uint256 tokensForClaimer = (totalAmountOfTokenDrop.mul(10**36)).div(
+            totalLockedWei.mul(lockedAmounts[claimer])
+        );
+        return (tokensForClaimer, lockedAmounts[claimer]);
     }
 }
