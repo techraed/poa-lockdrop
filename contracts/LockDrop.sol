@@ -25,6 +25,7 @@ contract LockDrop {
         dropStartTimeStamp = lockDeadline + 7 days;
     }
 
+    // TODO decide about min Lock amount or totalAmountOfTokenDrop stability
     function lock() external payable {
         require(lockDeadline > now, "Locking lasts 24 hours from contract creation");
         require(msg.value > 0, "You should stake gt 0 amount of ETH");
