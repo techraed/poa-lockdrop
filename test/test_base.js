@@ -16,7 +16,9 @@ contract('COLToken with LockDrop', async(accounts) => {
 
     let lockdropInst;
     let tokenInst;
+    let contractCreatedTimestamp;
     let lockDeadline;
+    let snapshotId;
     let dropStartTimeStamp;
     const totalAmountOfTokenDrop = 20000000000;
 
@@ -69,7 +71,7 @@ contract('COLToken with LockDrop', async(accounts) => {
         tokenInst = await COLTokenContract.new({from: actors.tokenOwner});
         lockdropInst = await LockDropContract.new(tokenInst.address, {from: actors.tokenOwner});
 
-        // settting lock drop address in token contract
+        // setting lock drop address in token contract
 
         //wrong access
         await expectThrow(
@@ -82,19 +84,20 @@ contract('COLToken with LockDrop', async(accounts) => {
         );
 
         await tokenInst.setLDContract(lockdropInst.address, {from: actors.tokenOwner});
+        contractCreatedTimestamp = await time.latest();
 
         console.log("[DEBUG] Token address", tokenInst.address);
         console.log("[DEBUG] LockDrop address", lockdropInst.address);
+        console.log("[DEBUG] Contract created at", contractCreatedTimestamp.toString());
     })
 
     it("shouldn't lock funds", async() => {
         // deadline is out
         let currentSnapshot = await takeSnapshot();
-        let snapshotId = currentSnapshot['result']
+        snapshotId = currentSnapshot['result']
 
         await time.advanceBlock();
-        let start = await time.latest();
-        lockDeadline = start.add(time.duration.hours(24));
+        lockDeadline = contractCreatedTimestamp.add(time.duration.hours(168)); // 7 days
         await time.increaseTo(lockDeadline);
 
         await expectThrow(
@@ -110,47 +113,64 @@ contract('COLToken with LockDrop', async(accounts) => {
 
     it("should lock funds from 5 users", async() => {
         await lockdropInst.lock({from: actors.locker1, value: web3.utils.toWei("1", "ether")});
+        let locker1LockInfo1 = await lockdropInst.locks.call(actors.locker1);
         await lockdropInst.lock({from: actors.locker1, value: web3.utils.toWei("1", "ether")});
-        
-        let locker1LockBalance = await lockdropInst.lockedAmounts.call(actors.locker1);
-        assert.equal(locker1LockBalance, web3.utils.toWei("2", "ether"));
+        let locker1LockInfo2 = await lockdropInst.locks.call(actors.locker1);
 
+        assert.equal(locker1LockInfo1.lockTimestamp.toString(), locker1LockInfo2.lockTimestamp.toString());
+        assert.equal(locker1LockInfo2.lockedAmount, web3.utils.toWei("2", "ether"));
+        
         await lockdropInst.lock({from: actors.locker2, value: web3.utils.toWei("2", "ether")});
         await lockdropInst.lock({from: actors.locker3, value: web3.utils.toWei("2", "ether")});
         await lockdropInst.lock({from: actors.locker4, value: web3.utils.toWei("2", "ether")});
         await lockdropInst.lock({from: actors.locker5, value: web3.utils.toWei("2", "ether")});
 
         let lockDropBalance = await web3.eth.getBalance(lockdropInst.address);
-        assert.equal(lockDropBalance, web3.utils.toWei("10", "ether"));
-        
+        assert.equal(lockDropBalance, web3.utils.toWei("10", "ether"));       
     });
 
-    it("shouldn't claim tokens and ether, drop hasn't started yet", async() => {
-        // lock time period ended up
-        await time.increaseTo(lockDeadline);
+    it("shouldn't claim tokens, but only ether, drop hasn't started yet", async() => {
+        // lock period hasn't expire yet
+        await expectThrow(
+            lockdropInst.claim(web3.utils.toWei("1", "ether"), {from: actors.locker5})
+        )
+        let locker5LockInfo5 = await lockdropInst.locks.call(actors.locker5);
+        await time.increaseTo(locker5LockInfo5.lockTimestamp.add(time.duration.hours(168)));
 
         await expectThrow(
-            lockdropInst.claim({from: actors.locker1})
+            lockdropInst.lock({from: actors.locker1, value: web3.utils.toWei("50", "ether")})
         );
+
+        await lockdropInst.claim(web3.utils.toWei("1", "ether"), {from: actors.locker4});
+        await lockdropInst.claim(web3.utils.toWei("1", "ether"), {from: actors.locker5});
+
+        // can't claim ETH more than locked
         await expectThrow(
-            lockdropInst.lock({from: actors.locker1, value: web3.utils.toWei("1", "ether")})
+            lockdropInst.claim(web3.utils.toWei("2", "ether"), {from: actors.locker4})
         );
+
+        let lockDropBalance = await web3.eth.getBalance(lockdropInst.address);
+        assert.equal(lockDropBalance, web3.utils.toWei("8", "ether"));
+
+        locker5LockInfo5 = await lockdropInst.locks.call(actors.locker5);
+        assert.equal(locker5LockInfo5.lockedAmount, web3.utils.toWei("1", "ether"));
+        await revertToSnapShot(snapshotId);
     });
 
     it("should claim tokens and ether back", async() => {
-        let start = await time.latest();
-        dropStartTimeStamp = start.add(time.duration.hours(168));
+        dropStartTimeStamp = lockDeadline.add(time.duration.hours(168));
         await time.increaseTo(dropStartTimeStamp);
 
-        await lockdropInst.claim({from: actors.locker1});
+        await lockdropInst.claim(0, {from: actors.locker1});
+
         // can't claim many times
         await expectThrow(
-            lockdropInst.claim({from: actors.locker1})
+            lockdropInst.claim(0, {from: actors.locker1})
         );
-        await lockdropInst.claim({from: actors.locker2});
-        await lockdropInst.claim({from: actors.locker3});
-        await lockdropInst.claim({from: actors.locker4});
-        await lockdropInst.claim({from: actors.locker5});
+        await lockdropInst.claim(0, {from: actors.locker2});
+        await lockdropInst.claim(0, {from: actors.locker3});
+        await lockdropInst.claim(0, {from: actors.locker4});
+        await lockdropInst.claim(0, {from: actors.locker5});
 
         let lockDropBalance = await web3.eth.getBalance(lockdropInst.address);
         assert.equal(lockDropBalance, 0);
@@ -158,14 +178,14 @@ contract('COLToken with LockDrop', async(accounts) => {
 
     it("check token balances", async() => {
         let balanceLocker1 = await tokenInst.balanceOf(actors.locker1);
-        assert.equal(balanceLocker1, 1000000000);
+        assert.equal(balanceLocker1, 1250000000);
         let balanceLocker2 = await tokenInst.balanceOf(actors.locker2);
-        assert.equal(balanceLocker2, 1000000000);
+        assert.equal(balanceLocker2, 1250000000);
         let balanceLocker3 = await tokenInst.balanceOf(actors.locker3);
-        assert.equal(balanceLocker3, 1000000000);
+        assert.equal(balanceLocker3, 1250000000);
         let balanceLocker4 = await tokenInst.balanceOf(actors.locker4);
-        assert.equal(balanceLocker4, 1000000000);
+        assert.equal(balanceLocker4, 2500000000);
         let balanceLocker5 = await tokenInst.balanceOf(actors.locker5);
-        assert.equal(balanceLocker5, 1000000000);
-    })
+        assert.equal(balanceLocker5, 2500000000);
+    });
 })

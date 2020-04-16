@@ -21,6 +21,9 @@ contract LockDrop {
     }
     mapping (address => LockerInfo) public locks;
 
+    event NewLock(address who, uint256 amount);
+    event ClaimedETH(address who, uint256 amount);
+
     constructor(COLToken token) public {
         require(address(token) != address(0), "Wrong token address value");
         lockingToken = token;
@@ -39,6 +42,8 @@ contract LockDrop {
         }
         locks[msg.sender].lockedAmount = locks[msg.sender].lockedAmount.add(msg.value);
         totalLockedWei = totalLockedWei.add(msg.value);
+
+        emit NewLock(msg.sender, msg.value);
     }
 
     function claim(uint256 amount) external {
@@ -67,6 +72,8 @@ contract LockDrop {
             lI.lockedAmount = lI.lockedAmount.sub(amount, "Locked less then wanted to be claimed");
             totalLockedWei = totalLockedWei.sub(amount);
             claimer.transfer(amount);
+
+            emit ClaimedETH(claimer, amount);
         } else {
             revert("Lock period hasn't expired yet");
         }
@@ -84,5 +91,7 @@ contract LockDrop {
 
         lockingToken.dropTokens(claimer, tokensForClaimer);
         claimer.transfer(ETHForClaimer);
+
+        emit ClaimedETH(claimer, ETHForClaimer);
     }
 }
