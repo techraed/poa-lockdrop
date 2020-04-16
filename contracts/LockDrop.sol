@@ -31,19 +31,18 @@ contract LockDrop {
     }
 
     function lock() external payable {
-        require(now < lockDeadline, "Locking lasts 24 hours from contract creation");
+        require(now < lockDeadline, "Locking action period is expired");
         require(msg.value > 0, "You should stake gt 0 amount of ETH");
 
-        LockerInfo storage lI = locks[msg.sender];
-        if (lI.lockTimestamp == 0) {
-            lI.lockTimestamp = now;
+        if (locks[msg.sender].lockTimestamp == 0) {
+            locks[msg.sender].lockTimestamp = now;
         }
-        lI.lockedAmount = lI.lockedAmount.add(msg.value);
+        locks[msg.sender].lockedAmount = locks[msg.sender].lockedAmount.add(msg.value);
         totalLockedWei = totalLockedWei.add(msg.value);
     }
 
     function claim(uint256 amount) external {
-        require(hasAmountToClaim(msg.sender), "You don't have tokens to claim");
+        require(hasAmountToClaim(msg.sender), "You don't have ETH or tokens to claim");
 
         if (now < dropStartTimeStamp) {
             claimETH(msg.sender, amount);
@@ -53,8 +52,7 @@ contract LockDrop {
     }
 
     function hasAmountToClaim(address claimer) internal view returns (bool) {
-        LockerInfo storage lI = locks[msg.sender];
-        if (lI.lockedAmount == 0) {
+        if (locks[claimer].lockedAmount == 0) {
             return false;
         }
         return true;
@@ -63,7 +61,8 @@ contract LockDrop {
     function claimETH(address payable claimer, uint256 amount) internal {
         require(amount > 0, "Claiming amount should be gt 0");
 
-        LockerInfo storage lI = locks[msg.sender];
+        // alias
+        LockerInfo storage lI = locks[claimer];
         if (now >= lI.lockTimestamp + 7 days) {
             lI.lockedAmount = lI.lockedAmount.sub(amount, "Locked less then wanted to be claimed");
             totalLockedWei = totalLockedWei.sub(amount);
@@ -73,8 +72,9 @@ contract LockDrop {
         }
     }
 
-    ///@notice totalAmountOfTokenDrop should be freezed as it is in COLToken
+    ///@notice totalAmountOfTokenDrop should be freezed/constant and be <= 2^256 // 10^36
     function claimTokensAndETH(address payable claimer) internal {
+        // alias
         LockerInfo storage lI = locks[claimer];
         uint256 tokensForClaimer = (totalAmountOfTokenDrop.mul(10**36)).div(
             totalLockedWei.mul(lI.lockedAmount)
