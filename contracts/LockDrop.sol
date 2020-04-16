@@ -24,10 +24,10 @@ contract LockDrop {
     event NewLock(address who, uint256 amount);
     event ClaimedETH(address who, uint256 amount);
 
-    constructor(COLToken token) public {
+    constructor(COLToken token, uint256 dropCap) public {
         require(address(token) != address(0), "Wrong token address value");
         lockingToken = token;
-        totalAmountOfTokenDrop = lockingToken.lockDropSupplyCap();
+        totalAmountOfTokenDrop = dropCap;
 
         lockDeadline = now + 7 days;
         dropStartTimeStamp = lockDeadline + 7 days;
@@ -71,6 +71,7 @@ contract LockDrop {
         if (now >= lI.lockTimestamp + 7 days) {
             lI.lockedAmount = lI.lockedAmount.sub(amount, "Locked less then wanted to be claimed");
             totalLockedWei = totalLockedWei.sub(amount);
+
             claimer.transfer(amount);
 
             emit ClaimedETH(claimer, amount);
@@ -89,7 +90,7 @@ contract LockDrop {
         uint256 ETHForClaimer = lI.lockedAmount;
         lI.lockedAmount = 0;
 
-        lockingToken.dropTokens(claimer, tokensForClaimer);
+        lockingToken.transfer(claimer, tokensForClaimer);
         claimer.transfer(ETHForClaimer);
 
         emit ClaimedETH(claimer, ETHForClaimer);

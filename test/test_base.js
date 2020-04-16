@@ -68,22 +68,17 @@ contract('COLToken with LockDrop', async(accounts) => {
     };
 
     before("preparing env", async() => {
-        tokenInst = await COLTokenContract.new({from: actors.tokenOwner});
-        lockdropInst = await LockDropContract.new(tokenInst.address, {from: actors.tokenOwner});
-
-        // setting lock drop address in token contract
-
+        tokenInst = await COLTokenContract.new(accounts[7], accounts[8], {from: actors.tokenOwner});
+        
         //wrong access
         await expectThrow(
-            tokenInst.setLDContract(lockdropInst.address, {from: actors.malicious})
+            tokenInst.beginLockDrop({from: actors.malicious})
         );
 
-        // wrong address value
-        await expectThrow(
-            tokenInst.setLDContract(zeroAddress, {from: actors.tokenOwner})
-        );
+        await tokenInst.beginLockDrop({from: actors.tokenOwner});
+        lockdropAddress = await tokenInst.lockDropContract.call();
+        lockdropInst = await LockDropContract.at(lockdropAddress);
 
-        await tokenInst.setLDContract(lockdropInst.address, {from: actors.tokenOwner});
         contractCreatedTimestamp = await time.latest();
 
         console.log("[DEBUG] Token address", tokenInst.address);
