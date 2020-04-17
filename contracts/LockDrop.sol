@@ -4,7 +4,7 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 import "./COLToken.sol";
 
-// TODO consider call(), not transfer, due to gas changes
+// TODO consider call(), not transfer, due to gas changes in Istanbul fork
 contract LockDrop {
     using SafeMath for uint256;
 
@@ -79,7 +79,6 @@ contract LockDrop {
         }
     }
 
-    ///@notice totalAmountOfTokenDrop should be freezed/constant and be <= 2^256 // 10^36
     function claimTokensAndETH(address payable claimer) internal {
         // alias
         LockerInfo storage lI = locks[claimer];
