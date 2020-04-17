@@ -173,14 +173,17 @@ contract('COLToken with LockDrop', async(accounts) => {
 
     it("check token balances", async() => {
         let balanceLocker1 = await tokenInst.balanceOf(actors.locker1);
-        assert.equal(balanceLocker1, 1250000000);
+        assert.equal(balanceLocker1, 5000000000 * Math.pow(10, 18));
         let balanceLocker2 = await tokenInst.balanceOf(actors.locker2);
-        assert.equal(balanceLocker2, 1250000000);
+        assert.equal(balanceLocker2, 5000000000 * Math.pow(10, 18));
         let balanceLocker3 = await tokenInst.balanceOf(actors.locker3);
-        assert.equal(balanceLocker3, 1250000000);
+        assert.equal(balanceLocker3, 5000000000 * Math.pow(10, 18));
         let balanceLocker4 = await tokenInst.balanceOf(actors.locker4);
-        assert.equal(balanceLocker4, 2500000000);
+        assert.equal(balanceLocker4, 2500000000 * Math.pow(10, 18));
         let balanceLocker5 = await tokenInst.balanceOf(actors.locker5);
-        assert.equal(balanceLocker5, 2500000000);
+        assert.equal(balanceLocker5, 2500000000 * Math.pow(10, 18));
+
+        let balanceOfLockDrop = await tokenInst.balanceOf(lockdropInst.address);
+        assert.equal(balanceOfLockDrop.toString(), "0");
     });
 })

@@ -25,7 +25,6 @@ contract LockDrop {
     event ClaimedETH(address who, uint256 amount);
 
     constructor(COLToken token, uint256 dropCap) public {
-        require(address(token) != address(0), "Wrong token address value");
         lockingToken = token;
         totalAmountOfTokenDrop = dropCap;
 
@@ -84,9 +83,7 @@ contract LockDrop {
     function claimTokensAndETH(address payable claimer) internal {
         // alias
         LockerInfo storage lI = locks[claimer];
-        uint256 tokensForClaimer = (totalAmountOfTokenDrop.mul(10**36)).div(
-            totalLockedWei.mul(lI.lockedAmount)
-        );
+        uint256 tokensForClaimer = totalAmountOfTokenDrop.div(totalLockedWei).mul(lI.lockedAmount);
         uint256 ETHForClaimer = lI.lockedAmount;
         lI.lockedAmount = 0;
 

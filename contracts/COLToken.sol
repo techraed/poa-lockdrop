@@ -18,25 +18,20 @@ contract COLToken is Ownable, ERC20 {
     uint256 public constant lockDropSupply =  20000000000; // 20 billions
     uint256 public constant stakingSupply  = 140000000000; // 140 billions
 
-    uint256 public tokensDropped;
     LockDrop public lockDropContract;
-
-    uint256 public tokensSend2Team;
     address public teamMultisig;
-
-    uint256 public tokensStaked;
     address public stakingMultisig;
 
     constructor(address teamMultisig_, address stakingMultisig_) public {
         teamMultisig = teamMultisig_;
         stakingMultisig = stakingMultisig_;
 
-        _mint(teamMultisig, teamSupply);
-        _mint(stakingMultisig, stakingSupply);
+        _mint(teamMultisig, teamSupply*10**uint256(decimals));
+        _mint(stakingMultisig, stakingSupply*10**uint256(decimals));
     }
 
     function beginLockDrop() external onlyOwner {
-        lockDropContract = new LockDrop(COLToken(this), lockDropSupply);
-        _mint(address(lockDropContract), lockDropSupply);
+        lockDropContract = new LockDrop(COLToken(this), lockDropSupply*10**uint256(decimals));
+        _mint(address(lockDropContract), lockDropSupply*10**uint256(decimals));
     }
 }
