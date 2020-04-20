@@ -76,6 +76,11 @@ contract('COLToken with LockDrop', async(accounts) => {
         );
 
         await tokenInst.beginLockDrop({from: actors.tokenOwner});
+
+        // can't perform lock drop 2 times
+        await expectThrow(
+            tokenInst.beginLockDrop({from: actors.tokenOwner})
+        );
         lockdropAddress = await tokenInst.lockDropContract.call();
         lockdropInst = await LockDropContract.at(lockdropAddress);
 

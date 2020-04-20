@@ -82,7 +82,7 @@ contract LockDrop {
     function claimTokensAndETH(address payable claimer) internal {
         // alias
         LockerInfo storage lI = locks[claimer];
-        uint256 tokensForClaimer = totalAmountOfTokenDrop.div(totalLockedWei).mul(lI.lockedAmount);
+        uint256 tokensForClaimer = totalAmountOfTokenDrop.mul(lI.lockedAmount).div(totalLockedWei);
         uint256 ETHForClaimer = lI.lockedAmount;
         lI.lockedAmount = 0;
 

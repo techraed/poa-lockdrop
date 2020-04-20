@@ -31,6 +31,10 @@ contract COLToken is Ownable, ERC20 {
     }
 
     function beginLockDrop() external onlyOwner {
+        require(
+            totalSupply() == (teamSupply + stakingSupply) * 10**uint256(decimals),
+            "Can't do 2 lock drops"
+        );
         lockDropContract = new LockDrop(COLToken(this), lockDropSupply * 10**uint256(decimals));
         _mint(address(lockDropContract), lockDropSupply * 10**uint256(decimals));
     }
